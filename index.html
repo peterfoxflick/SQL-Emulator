@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>SQL Editor</title>
+    <!-- Boostrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+<!-- Prism - Syntax highlighting -->
+<link href="./prism.css" rel="stylesheet">
+<link href="./prism-live.css" rel="stylesheet">
+
+  </head>
+  <body>
+    <div class="container">
+      <h1>Welcome</h1>
+    </div>
+
+    <div class="container-fluid">
+
+        <div id="table-holder">
+          <pre>
+            +--------+  +-----------+  +--------------+
+            | Stores |  | Inventory |  |   Flavors    |
+            +--------+  +-----------+  +--------------+
+            | id     |--| storeID   |┌-| id           |
+            | street |  | flavorID  |┘ | name         |
+            | state  |  | count     |  | cost         |
+            | open   |  |           |  | created      |
+            | closed |  |           |  | discontinued |
+            | profit |  |           |  |              |
+            +--------+  +-----------+  +--------------+
+          </pre>
+        </div>
+    </div>
+
+
+    <div class="container">
+      <div class="input-group">
+        <textarea class="form-control form-control-lg prism-live language-SQL"  id="user-SQL" ></textarea>
+        <div class="input-group-append" style="margin-left:12px">
+          <button type="button" class="btn btn-outline-primary" onclick="runSQL()">RUN</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="container">
+      <div class="pre-scrollable">
+        <pre><code id="console">Console Text Will Appear Here HER</code></pre>
+      </div>
+    </div>
+
+
+
+    <!-- SQL -->
+    <script src="./sql-wasm.js"></script>
+
+
+    <script type="text/javascript">
+  //    const initSqlJs = require('sql.js');
+        // or if you are in a browser:
+        // const initSqlJs = window.initSqlJs;
+
+      config = {
+           locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.7.0/sql-wasm.wasm`
+         }
+       // The `initSqlJs` function is globally provided by all of the main dist files if loaded in the browser.
+       // We must specify this locateFile function if we are loading a wasm file from anywhere other than the current html page's folder.
+let db = null
+       initSqlJs(config).then(function(SQL){
+         //Create the database
+         db = new SQL.Database();
+
+         // Run a query without reading the results
+         db.run("CREATE TABLE test (col1, col2);");
+         // Insert two rows: (1,111) and (2,222)
+         db.run("INSERT INTO test VALUES (?,?), (?,?)", [1,111,2,222]);
+
+         initTables()
+       }).then(x=>{
+         setStartCommand()
+       })
+
+       function setStartCommand(){
+         document.getElementById('user-SQL').value =
+         `SELECT *
+FROM stores`
+       }
+
+
+       function runSQL(){
+         try {
+           const stmt = db.prepare(document.getElementById('user-SQL').value);
+           appendConsole("Running Command: " + document.getElementById('user-SQL').value.replace("\n", " "))
+
+           stmt.getAsObject(); // {col1:1, col2:111}
+
+           var rows = []
+           // Bind new values
+           while(stmt.step()) { //
+             const row = stmt.getAsObject();
+             console.log('Here is a row: ' + JSON.stringify(row));
+             rows.push(row)
+           }
+
+           popTable(rows)
+           appendConsole("Table Populated", "SUCCESS")
+
+         } catch (e) {
+          appendConsole(e, "ERROR")
+         }
+       }
+
+
+
+
+
+       function popTable(rows){ //Thanks: https://stackoverflow.com/questions/44127872/convert-array-of-objects-into-html-table-with-jquery-or-javascript
+         var html = '<table class="table table-light table-hover">';
+        html += '<thead class="thead-dark"><tr>';
+        for( var j in rows[0] ) {
+         html += '<th scope="col">' + j + '</th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        for( var i = 0; i < rows.length; i++) {
+         html += '<tr>';
+         for( var j in rows[i] ) {
+           if(j == "profit"){
+             html += '<td>' + rows[i][j].toFixed(2).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + '</td>';
+           } else {
+             html += '<td>' + rows[i][j] + '</td>';
+           }
+         }
+         html += '</tr>';
+        }
+        html += '</tbody></table>';
+        document.getElementById('table-holder').innerHTML = html;
+
+       }
+
+
+       function appendConsole(text, option = null){
+         let now = new Date()
+         let c = document.getElementById('console')
+
+
+         let total = ""
+
+         if(option === "ERROR"){
+           total += "<span class='text-danger'>" + now.toLocaleTimeString() + ":: " + text + "</span>"
+         } else if (option === "SUCCESS"){
+           total += "<span class='text-success'>" + now.toLocaleTimeString() + ":: " + text + "</span>"
+         } else {
+           total += now.toLocaleTimeString() + ":: " + text
+         }
+
+         total += '\n' + c.innerHTML
+
+         c.innerHTML = total.split('\n').slice(0, 4).join('\n')
+       }
+
+       function initTables(){
+         //Ice cream?
+
+         //Flavors - Stores - inventory
+
+         db.run("CREATE TABLE stores (id integer, street text, city text, state text, opened date, closed date, profit float);");
+         db.run("INSERT INTO stores VALUES (1, '100 Pine St', 'Harrisburg', 'PA', '2018-01-19', NULL, 170000.00)");
+         db.run("INSERT INTO stores VALUES (2, '800 North Av', 'Queens', 'NY', '2018-06-01', '2020-07-09', 8000)");
+         db.run("INSERT INTO stores VALUES (3, '120 Washington Ln', 'Queens', 'NY', '2019-03-21', NULL, 210000)");
+         db.run("INSERT INTO stores VALUES (4, '101 North St', 'Harrisburg', 'PA', '2020-10-14', NULL, 120000)");
+         db.run("INSERT INTO stores VALUES (5, '118 East River', 'Philadelphia', 'NY', '2022-5-12', NULL, 190000)");
+
+
+         db.run("CREATE TABLE flavors (id integer, name text, cost float, created date, bestseller bool);");
+         db.run("INSERT INTO flavors VALUES (1, 'Vanilla Vista', 1.01, '2001-06-19', true)");
+         db.run("INSERT INTO flavors VALUES (2, 'Chocolate Care', 1.49, '2001-01-19', true)");
+      //   db.run("INSERT INTO flavors VALUES (3, 'Minty Mountains', 1.30, '2001-06-19', '2008-07-09')");
+         db.run("INSERT INTO flavors VALUES (4, 'Pecan Pie', 1.81, '2010-01-19', false)");
+
+
+         db.run("CREATE TABLE inventory (storeID integer, flavorID integer, count integer);");
+         db.run("INSERT INTO inventory VALUES (1, 1, 10)");
+         db.run("INSERT INTO inventory VALUES (1, 2, 18)");
+         db.run("INSERT INTO inventory VALUES (1, 4, 11)");
+
+         db.run("INSERT INTO inventory VALUES (3, 1, 4)");
+         db.run("INSERT INTO inventory VALUES (3, 2, 11)");
+         db.run("INSERT INTO inventory VALUES (3, 4, 8)");
+
+         db.run("INSERT INTO inventory VALUES (4, 1, 19)");
+         db.run("INSERT INTO inventory VALUES (4, 2, 1)");
+         db.run("INSERT INTO inventory VALUES (4, 3, 1)");
+         db.run("INSERT INTO inventory VALUES (4, 4, 4)");
+
+         db.run("INSERT INTO inventory VALUES (5, 1, 8)");
+         db.run("INSERT INTO inventory VALUES (5, 2, 10)");
+         db.run("INSERT INTO inventory VALUES (5, 4, 2)");
+       }
+
+
+
+    </script>
+
+
+<!-- Prism -->
+    <script src="./prism.js"></script>
+    <script src="./prism-live.js?load=sql"></script>
+
+<!-- Boostrap stuff -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+  </body>
+</html>
